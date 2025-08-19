@@ -21,8 +21,9 @@ export default function ConnectButton({ slug }: { slug: string }) {
       }
       // return_url in your API should be /coach/payouts?return=1
       window.location.href = json.url
-    } catch (e: any) {
-      alert(e?.message ?? 'Network error')
+    } catch (err: unknown) {
+      const message = err instanceof Error ? err.message : 'Network error'
+      alert(message)
       setLoading(false)
     }
   }

@@ -9,8 +9,11 @@ type Status = 'ready' | 'not-ready' | 'not-connected'
 export default async function PayoutsPage({
   searchParams,
 }: {
-  searchParams?: { return?: string }
+  searchParams?: Promise<{ return?: string }>
 }) {
+  const sp = (await searchParams) ?? {}
+  const cameBackFromStripe = Boolean(sp.return)
+
   const supabase = createClient()
 
   // TEMP: target your test coach; later use the logged-in coach’s id/slug.
@@ -42,8 +45,8 @@ export default async function PayoutsPage({
     ? 'not-ready'
     : 'not-connected'
 
-  const showSuccess = Boolean(searchParams?.return) && status === 'ready'
-
+  const showSuccess = cameBackFromStripe && status === 'ready'
+  
   return (
     <Shell>
       <Card>

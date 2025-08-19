@@ -1,15 +1,19 @@
-import { createServerClient, type CookieOptions } from '@supabase/ssr'
+// lib/supabase/admin.ts
+import 'server-only'
+import { createClient } from '@supabase/supabase-js'
 
 export function createAdminClient() {
-  return createServerClient(
-    process.env.NEXT_PUBLIC_SUPABASE_URL!,
-    process.env.SUPABASE_SECRET_KEY!,
-    {
-      cookies: {
-        get() { return undefined },
-        set(_n: string, _v: string, _o: CookieOptions) {},
-        remove(_n: string, _o: CookieOptions) {},
-      },
-    }
-  )
+  const url = process.env.NEXT_PUBLIC_SUPABASE_URL
+  const secret = process.env.SUPABASE_SECRET_KEY  // ← keep your name
+
+  if (!url) throw new Error('Missing NEXT_PUBLIC_SUPABASE_URL')
+  if (!secret) throw new Error('Missing SUPABASE_SECRET_KEY (server secret)')
+
+  // Admin client: no user session handling, runs only on the server
+  return createClient(url, secret, {
+    auth: {
+      autoRefreshToken: false,
+      persistSession: false,
+    },
+  })
 }

@@ -1,5 +1,5 @@
-export const dynamic = 'force-dynamic'  // ensure fresh data during dev
-export const revalidate = 0             // (optional) no ISR caching
+export const dynamic = 'force-dynamic'
+export const revalidate = 0
 
 import Image from 'next/image'
 import Script from 'next/script'
@@ -7,19 +7,28 @@ import { notFound } from 'next/navigation'
 import { createClient } from '@/lib/supabase/server'
 import Contribution from './pay'
 
-type PageProps = {
-  params: { slug: string }
-  searchParams?: { paid?: string; canceled?: string }
-}
+export default async function CoachProfilePage({
+  params,
+  searchParams,
+}: {
+  // Next.js 15: both of these are Promises in server pages
+  params: Promise<{ slug: string }>
+  searchParams?: Promise<{ paid?: string; canceled?: string }>
+}) {
+  // Resolve the Promises once at the top
+  const p  = await params
+  const sp = (await searchParams) ?? {}
 
-export default async function CoachProfilePage({ params, searchParams }: PageProps) {
+  const paid     = sp.paid === '1'
+  const canceled = sp.canceled === '1'
+
   const supabase = createClient()
 
   // 1) Core profile by slug
   const { data: coach, error: coachErr } = await supabase
     .from('users')
     .select('id, name, bio, avatar_url, timezone, slug, stripe_onboarded')
-    .eq('slug', params.slug)
+    .eq('slug', p.slug)
     .single()
 
   if (coachErr || !coach) return notFound()
@@ -30,11 +39,7 @@ export default async function CoachProfilePage({ params, searchParams }: PagePro
     .select('focus_areas, calendly_url, status')
     .eq('user_id', coach.id)
     .eq('status', 'approved')
-    .maybeSingle() // safer: returns null if not found instead of error
-
-  // 3) Post-Checkout flags from the URL query string
-  const paid = searchParams?.paid === '1'
-  const canceled = searchParams?.canceled === '1'
+    .maybeSingle() // returns null if none
 
   return (
     <main className="min-h-screen bg-gradient-to-b from-rose-50 via-amber-50 to-indigo-50">
@@ -72,13 +77,13 @@ export default async function CoachProfilePage({ params, searchParams }: PagePro
           </p>
         )}
 
-        {/* Calendly embed (only if application approved & link present) */}
+        {/* Calendly embed */}
         {app?.calendly_url ? (
           <section className="mt-10">
             <h2 className="text-xl font-semibold">Book a session</h2>
             <div
               className="calendly-inline-widget mt-4 h-[720px] w-full rounded-xl bg-white/70 p-1 shadow ring-1 ring-black/5"
-              data-url={`${app.calendly_url}?cal_ref=${coach.id}`} // pass coach id through
+              data-url={`${app.calendly_url}?cal_ref=${coach.id}`}
             />
             <Script src="https://assets.calendly.com/assets/external/widget.js" strategy="lazyOnload" />
           </section>

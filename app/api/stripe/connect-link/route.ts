@@ -1,31 +1,33 @@
+// app/api/stripe/connect-link/route.ts
+export const runtime = 'nodejs'
+
 import { NextResponse } from 'next/server'
 import { stripe } from '@/lib/stripe'
 import { createAdminClient } from '@/lib/supabase/admin'
 
-export async function POST() {
-  try {
-    const supabase = createAdminClient()
+type ConnectBody = { slug: string }
 
-    // TODO: replace this lookup with the *logged-in coach* when Auth is added.
+export async function POST(req: Request) {
+  try {
+    const { slug } = (await req.json()) as ConnectBody
+    if (!slug) return NextResponse.json({ error: 'Missing slug' }, { status: 400 })
+
+    const supabase = createAdminClient()
     const { data: coach, error } = await supabase
       .from('users')
       .select('id, email, stripe_account_id')
-      .eq('role', 'coach')
-      .limit(1)
+      .eq('slug', slug)
       .single()
 
-    if (error || !coach) {
-      return NextResponse.json({ error: 'Coach not found (placeholder lookup)' }, { status: 400 })
-    }
+    if (error || !coach) return NextResponse.json({ error: 'Coach not found' }, { status: 404 })
 
-    // 1) Create (or reuse existing) Connect Express account
     let accountId = coach.stripe_account_id
     if (!accountId) {
       const acct = await stripe.accounts.create({
         type: 'express',
         country: 'US',
         business_type: 'individual',
-        email: coach.email || undefined,
+        email: coach.email ?? undefined,
         capabilities: {
           card_payments: { requested: true },
           transfers: { requested: true },
@@ -35,18 +37,18 @@ export async function POST() {
       await supabase.from('users').update({ stripe_account_id: accountId }).eq('id', coach.id)
     }
 
-    // 2) Create onboarding link (single-use URL)
     const site = process.env.NEXT_PUBLIC_SITE_URL ?? 'http://localhost:3000'
     const link = await stripe.accountLinks.create({
       account: accountId!,
       type: 'account_onboarding',
-      return_url:  `${site}/coach/payouts?return=1`,
+      return_url: `${site}/coach/payouts?return=1`,
       refresh_url: `${site}/coach/payouts?refresh=1`,
     })
 
-    return NextResponse.json({ url: link.url })
-  } catch (e: any) {
-    console.error('connect-link error', e)
-    return NextResponse.json({ error: e.message ?? 'Connect link error' }, { status: 400 })
+    return NextResponse.json({ url: link.url }, { status: 200 })
+  } catch (err: unknown) {
+    const message = err instanceof Error ? err.message : 'Connect link error'
+    console.error('connect-link error:', err)
+    return NextResponse.json({ error: message }, { status: 400 })
   }
 }
