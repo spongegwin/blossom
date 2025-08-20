@@ -152,7 +152,7 @@ export default async function CoachProfilePage({
 
                 {coach.stripe_onboarded ? (
                   <div className="mt-4">
-                    <Contribution coachId={coach.id} />
+                    <Contribution coachId={coach.id} slug={coach.slug} />
                   </div>
                 ) : (
                   <p className="mt-3 text-amber-700">
